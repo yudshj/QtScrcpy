@@ -3,6 +3,7 @@
 
 #include <QPointer>
 #include <QWidget>
+#include <QVector>
 
 #include "../QtScrcpyCore/include/QtScrcpyCore.h"
 
@@ -15,6 +16,7 @@ class ToolForm;
 class FileHandler;
 class QYUVOpenGLWidget;
 class QLabel;
+class KeyMapOverlayWidget;
 class VideoForm : public QWidget, public qsc::DeviceObserver
 {
     Q_OBJECT
@@ -33,6 +35,10 @@ public:
     void showFPS(bool show);
     void switchFullScreen();
     bool isHost();
+    void setKeyMapScript(const QString &script);
+    void setKeyMapOverlayVisible(bool visible);
+    void toggleKeyMapOverlay();
+    bool keyMapOverlayVisible() const;
 
 private:
     void onFrame(int width, int height, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
@@ -48,6 +54,8 @@ private:
     void moveCenter();
     void installShortcut();
     QRect getScreenRect();
+    void updateKeyMapOverlayGeometry();
+    void parseKeyMapOverlayItems(const QString &script);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -62,6 +70,7 @@ protected:
     void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
@@ -74,7 +83,9 @@ private:
     QPointer<ToolForm> m_toolForm;
     QPointer<QWidget> m_loadingWidget;
     QPointer<QYUVOpenGLWidget> m_videoWidget;
+    QPointer<KeyMapOverlayWidget> m_keyMapOverlay;
     QPointer<QLabel> m_fpsLabel;
+    QPointer<QLabel> m_keyMapModeLabel;
 
     //inside member
     QSize m_frameSize;
@@ -84,6 +95,8 @@ private:
     bool m_skin = true;
     QPoint m_fullScreenBeforePos;
     QString m_serial;
+    bool m_keyMapOverlayVisible = false;
+    QString m_keyMapScript;
 
     //Whether to display the toolbar when connecting a device.
     bool show_toolbar = true;

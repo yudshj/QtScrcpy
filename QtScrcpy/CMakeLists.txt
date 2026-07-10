@@ -91,6 +91,9 @@ if (NOT MSVC)
 
     # disable some warning
     add_compile_options(-Wno-nested-anon-types -Wno-c++17-extensions -Wno-overloaded-virtual)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        add_compile_options(-Wno-deprecated-pragma)
+    endif()
 endif()
 
 #
@@ -130,7 +133,9 @@ set(LINK_LIBS
 
 if (QT_DESIRED_VERSION MATCHES 6)
     # list(APPEND LINK_LIBS Qt${QT_DESIRED_VERSION}::Core5Compat)
-    list(APPEND LINK_LIBS Qt${QT_DESIRED_VERSION}::GuiPrivate)
+    if (TARGET Qt${QT_DESIRED_VERSION}::GuiPrivate)
+        list(APPEND LINK_LIBS Qt${QT_DESIRED_VERSION}::GuiPrivate)
+    endif()
     list(APPEND LINK_LIBS Qt${QT_DESIRED_VERSION}::OpenGL)
     list(APPEND LINK_LIBS Qt${QT_DESIRED_VERSION}::OpenGLWidgets)
 else()
@@ -179,6 +184,8 @@ set(QC_UI_SOURCES
     ui/dialog.cpp
     ui/dialog.h
     ui/dialog.ui
+    ui/keymapeditordialog.h
+    ui/keymapeditordialog.cpp
     render/qyuvopenglwidget.h
     render/qyuvopenglwidget.cpp
 )

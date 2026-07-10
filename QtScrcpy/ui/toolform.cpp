@@ -1,6 +1,7 @@
 #include <QDebug>
 #include <QHideEvent>
 #include <QMouseEvent>
+#include <QPushButton>
 #include <QShowEvent>
 
 #include "iconhelper.h"
@@ -14,6 +15,20 @@ ToolForm::ToolForm(QWidget *adsorbWidget, AdsorbPositions adsorbPos) : MagneticW
     ui->setupUi(this);
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     //setWindowFlags(windowFlags() & ~Qt::WindowMinMaxButtonsHint);
+
+    m_keyMapOverlayBtn = new QPushButton(this);
+    m_keyMapOverlayBtn->setObjectName("keyMapOverlayBtn");
+    m_keyMapOverlayBtn->setCheckable(true);
+    m_keyMapOverlayBtn->setChecked(false);
+    m_keyMapOverlayBtn->setFocusPolicy(Qt::NoFocus);
+    m_keyMapOverlayBtn->setToolTip(tr("show/hide keymap overlay"));
+    ui->verticalLayout->insertWidget(2, m_keyMapOverlayBtn);
+    connect(m_keyMapOverlayBtn, &QPushButton::clicked, this, [this]() {
+        VideoForm *videoForm = dynamic_cast<VideoForm*>(parent());
+        if (videoForm) {
+            videoForm->setKeyMapOverlayVisible(m_keyMapOverlayBtn->isChecked());
+        }
+    });
 
     updateGroupControl();
 
@@ -35,6 +50,14 @@ bool ToolForm::isHost()
     return m_isHost;
 }
 
+void ToolForm::setKeyMapOverlayVisible(bool visible)
+{
+    if (m_keyMapOverlayBtn) {
+        m_keyMapOverlayBtn->setChecked(visible);
+        m_keyMapOverlayBtn->setStyleSheet(visible ? "color: #58d68d" : "");
+    }
+}
+
 void ToolForm::initStyle()
 {
     IconHelper::Instance()->SetIcon(ui->fullScreenBtn, QChar(0xf0b2), 15);
@@ -53,6 +76,9 @@ void ToolForm::initStyle()
     IconHelper::Instance()->SetIcon(ui->touchBtn, QChar(0xf111), 15);
     IconHelper::Instance()->SetIcon(ui->groupControlBtn, QChar(0xf0c0), 15);
     IconHelper::Instance()->SetIcon(ui->clipboardBtn, QChar(0xf0c5), 15);
+    if (m_keyMapOverlayBtn) {
+        IconHelper::Instance()->SetIcon(m_keyMapOverlayBtn, QChar(0xf11c), 15);
+    }
 }
 
 void ToolForm::updateGroupControl()

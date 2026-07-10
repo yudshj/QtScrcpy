@@ -13,6 +13,7 @@ namespace Ui
 }
 
 class Device;
+class QPushButton;
 class ToolForm : public MagneticWidget
 {
     Q_OBJECT
@@ -23,6 +24,7 @@ public:
 
     void setSerial(const QString& serial);
     bool isHost();
+    void setKeyMapOverlayVisible(bool visible);
 
 protected:
     void mousePressEvent(QMouseEvent *event);
@@ -57,6 +59,7 @@ private:
     Ui::ToolForm *ui;
     QPoint m_dragPosition;
     QString m_serial;
+    QPushButton *m_keyMapOverlayBtn = nullptr;
     bool m_showTouch = false;
     bool m_isHost = false;
 };

@@ -2,12 +2,14 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
+#include <QPushButton>
 #include <QRandomGenerator>
 #include <QTime>
 #include <QTimer>
 
 #include "config.h"
 #include "dialog.h"
+#include "keymapeditordialog.h"
 #include "ui_dialog.h"
 #include "videoform.h"
 #include "../groupcontroller/groupcontroller.h"
@@ -35,7 +37,29 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     ui->setupUi(this);
     initUI();
 
+    QPushButton *editScriptBtn = new QPushButton(tr("edit script"), this);
+    ui->horizontalLayout_8->addWidget(editScriptBtn);
+    connect(editScriptBtn, &QPushButton::clicked, this, [this]() {
+        QString fileName = ui->gameBox->currentText();
+        if (fileName.isEmpty()) {
+            QMessageBox::warning(this, tr("Keymap Editor"), tr("Please select a script first."));
+            return;
+        }
+        KeyMapEditorDialog editor(getKeyMapPath() + "/" + fileName, this);
+        editor.exec();
+        auto device = qsc::IDeviceManage::getInstance().getDevice(ui->serialBox->currentText().trimmed());
+        if (device) {
+            QString script = getGameScript(fileName);
+            device->updateScript(script);
+            auto data = device->getUserData();
+            if (data) {
+                static_cast<VideoForm*>(data)->setKeyMapScript(script);
+            }
+        }
+    });
+
     updateBootConfig(true);
+    on_refreshGameScriptBtn_clicked();
 
     on_useSingleModeCheck_clicked();
     on_updateDevice_clicked();
@@ -504,6 +528,7 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
     }
     auto videoForm = new VideoForm(ui->framelessCheck->isChecked(), Config::getInstance().getSkin(), ui->showToolbar->isChecked());
     videoForm->setSerial(serial);
+    videoForm->setKeyMapScript(getGameScript(ui->gameBox->currentText()));
 
     qsc::IDeviceManage::getInstance().getDevice(serial)->setUserData(static_cast<void*>(videoForm));
     qsc::IDeviceManage::getInstance().getDevice(serial)->registerDeviceObserver(videoForm);
@@ -622,6 +647,11 @@ void Dialog::on_refreshGameScriptBtn_clicked()
         fileInfo = list.at(i);
         ui->gameBox->addItem(fileInfo.fileName());
     }
+
+    int hydIndex = ui->gameBox->findText("gp-hyd.json");
+    if (hydIndex >= 0) {
+        ui->gameBox->setCurrentIndex(hydIndex);
+    }
 }
 
 void Dialog::on_applyScriptBtn_clicked()
@@ -632,7 +662,12 @@ void Dialog::on_applyScriptBtn_clicked()
         return;
     }
 
-    device->updateScript(getGameScript(ui->gameBox->currentText()));
+    QString script = getGameScript(ui->gameBox->currentText());
+    device->updateScript(script);
+    auto data = device->getUserData();
+    if (data) {
+        static_cast<VideoForm*>(data)->setKeyMapScript(script);
+    }
 }
 
 void Dialog::on_recordScreenCheck_clicked(bool checked)

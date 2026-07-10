@@ -1,5 +1,8 @@
 // #include <QDesktopWidget>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QMessageBox>
 #include <QMimeData>
@@ -25,6 +28,114 @@
 #include "ui_videoform.h"
 #include "videoform.h"
 
+struct KeyMapOverlayItem
+{
+    QString label;
+    QString type;
+    QPointF start;
+    QPointF end;
+    bool hasEnd = false;
+};
+
+static double bound01(double value)
+{
+    return qMax(0.0, qMin(1.0, value));
+}
+
+static QString displayKeyName(const QString &key)
+{
+    if (key == "LeftButton") {
+        return "LMB";
+    }
+    if (key == "RightButton") {
+        return "RMB";
+    }
+    if (key.startsWith("Key_")) {
+        return key.mid(4);
+    }
+    return key;
+}
+
+class KeyMapOverlayWidget : public QWidget
+{
+public:
+    explicit KeyMapOverlayWidget(QWidget *parent = 0) : QWidget(parent)
+    {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
+    }
+
+    void setItems(const QVector<KeyMapOverlayItem> &items)
+    {
+        m_items = items;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event)
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        for (int i = 0; i < m_items.size(); ++i) {
+            drawItem(&painter, m_items.at(i));
+        }
+    }
+
+private:
+    QPointF toWidget(const QPointF &point) const
+    {
+        return QPointF(point.x() * width(), point.y() * height());
+    }
+
+    void drawItem(QPainter *painter, const KeyMapOverlayItem &item)
+    {
+        QPointF start = toWidget(item.start);
+        QColor fill(244, 197, 66, 135);
+        QColor stroke(20, 27, 36, 180);
+        if (item.type == "KMT_STEER_WHEEL") {
+            fill = QColor(47, 128, 237, 125);
+        } else if (item.type == "mouseMoveMap") {
+            fill = QColor(155, 97, 255, 120);
+        } else if (item.hasEnd) {
+            fill = QColor(232, 92, 74, 120);
+        }
+
+        if (item.hasEnd) {
+            QPointF end = toWidget(item.end);
+            painter->setPen(QPen(QColor(255, 255, 255, 140), 3));
+            painter->drawLine(start, end);
+            painter->setBrush(QColor(232, 92, 74, 135));
+            painter->setPen(QPen(stroke, 2));
+            painter->drawEllipse(end, 10, 10);
+        }
+
+        painter->setBrush(fill);
+        painter->setPen(QPen(stroke, 2));
+        painter->drawEllipse(start, 14, 14);
+
+        QString text = item.label.isEmpty() ? item.type : item.label;
+        QFont font = painter->font();
+        font.setBold(true);
+        font.setPointSize(10);
+        painter->setFont(font);
+        QRect textRect = painter->fontMetrics().boundingRect(text).adjusted(-8, -5, 8, 5);
+        QPoint textTopLeft(qRound(start.x() - textRect.width() / 2), qRound(start.y() - 40));
+        textTopLeft.setX(qMax(2, qMin(width() - textRect.width() - 2, textTopLeft.x())));
+        textTopLeft.setY(qMax(2, qMin(height() - textRect.height() - 2, textTopLeft.y())));
+        textRect.moveTopLeft(textTopLeft);
+
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(18, 24, 33, 135));
+        painter->drawRoundedRect(textRect, 5, 5);
+        painter->setPen(QColor(255, 255, 255, 230));
+        painter->drawText(textRect, Qt::AlignCenter, text);
+    }
+
+    QVector<KeyMapOverlayItem> m_items;
+};
+
 VideoForm::VideoForm(bool framelessWindow, bool skin, bool showToolbar, QWidget *parent) : QWidget(parent), ui(new Ui::videoForm), m_skin(skin)
 {
     ui->setupUi(this);
@@ -43,6 +154,7 @@ VideoForm::VideoForm(bool framelessWindow, bool skin, bool showToolbar, QWidget 
 
 VideoForm::~VideoForm()
 {
+    grabCursor(false);
     delete ui;
 }
 
@@ -64,9 +176,13 @@ void VideoForm::initUI()
     }
 
     m_videoWidget = new QYUVOpenGLWidget();
+    m_videoWidget->setFocusPolicy(Qt::NoFocus);
     m_videoWidget->hide();
     ui->keepRatioWidget->setWidget(m_videoWidget);
     ui->keepRatioWidget->setWidthHeightRatio(m_widthHeightRatio);
+
+    m_keyMapOverlay = new KeyMapOverlayWidget(ui->keepRatioWidget);
+    m_keyMapOverlay->hide();
 
     m_fpsLabel = new QLabel(m_videoWidget);
     QFont ft;
@@ -78,6 +194,22 @@ void VideoForm::initUI()
     m_fpsLabel->setMinimumWidth(100);
     m_fpsLabel->setStyleSheet(R"(QLabel {color: #00FF00;})");
 
+    m_keyMapModeLabel = new QLabel(m_videoWidget);
+    m_keyMapModeLabel->setAlignment(Qt::AlignCenter);
+    m_keyMapModeLabel->setStyleSheet(R"(
+        QLabel {
+            color: white;
+            background: rgba(18, 24, 33, 190);
+            border: 1px solid rgba(255, 255, 255, 150);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+    )");
+    m_keyMapModeLabel->hide();
+
+    setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     m_videoWidget->setMouseTracking(true);
     ui->keepRatioWidget->setMouseTracking(true);
@@ -159,6 +291,7 @@ void VideoForm::updateRender(int width, int height, uint8_t* dataY, uint8_t* dat
     updateShowSize(QSize(width, height));
     m_videoWidget->setFrameSize(QSize(width, height));
     m_videoWidget->updateTextures(dataY, dataU, dataV, linesizeY, linesizeU, linesizeV);
+    updateKeyMapOverlayGeometry();
 }
 
 void VideoForm::setSerial(const QString &serial)
@@ -166,11 +299,40 @@ void VideoForm::setSerial(const QString &serial)
     m_serial = serial;
 }
 
+void VideoForm::setKeyMapScript(const QString &script)
+{
+    m_keyMapScript = script;
+    parseKeyMapOverlayItems(script);
+}
+
+void VideoForm::setKeyMapOverlayVisible(bool visible)
+{
+    m_keyMapOverlayVisible = visible;
+    if (m_keyMapOverlay) {
+        m_keyMapOverlay->setVisible(visible && !m_keyMapScript.trimmed().isEmpty());
+        m_keyMapOverlay->raise();
+    }
+    if (m_toolForm) {
+        m_toolForm->setKeyMapOverlayVisible(visible);
+    }
+}
+
+void VideoForm::toggleKeyMapOverlay()
+{
+    setKeyMapOverlayVisible(!m_keyMapOverlayVisible);
+}
+
+bool VideoForm::keyMapOverlayVisible() const
+{
+    return m_keyMapOverlayVisible;
+}
+
 void VideoForm::showToolForm(bool show)
 {
     if (!m_toolForm) {
         m_toolForm = new ToolForm(this, ToolForm::AP_OUTSIDE_RIGHT);
         m_toolForm->setSerial(m_serial);
+        m_toolForm->setKeyMapOverlayVisible(m_keyMapOverlayVisible);
     }
     m_toolForm->move(pos().x() + geometry().width(), pos().y() + 30);
     m_toolForm->setVisible(show);
@@ -211,6 +373,11 @@ void VideoForm::installShortcut()
     shortcut = new QShortcut(QKeySequence("Ctrl+w"), this);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() { removeBlackRect(); });
+
+    // keymap overlay
+    shortcut = new QShortcut(QKeySequence("Ctrl+k"), this);
+    shortcut->setAutoRepeat(false);
+    connect(shortcut, &QShortcut::activated, this, [this]() { toggleKeyMapOverlay(); });
 
     // postGoHome
     shortcut = new QShortcut(QKeySequence("Ctrl+h"), this);
@@ -534,6 +701,19 @@ void VideoForm::grabCursor(bool grab)
 {
     QRect rc = getGrabCursorRect();
     MouseTap::getInstance()->enableMouseEventTap(rc, grab);
+
+    if (m_keyMapModeLabel) {
+        m_keyMapModeLabel->setText(grab ? tr("KEYMAP ON") : tr("KEYMAP OFF"));
+        m_keyMapModeLabel->adjustSize();
+        m_keyMapModeLabel->move(qMax(0, (m_videoWidget->width() - m_keyMapModeLabel->width()) / 2), 20);
+        m_keyMapModeLabel->raise();
+        m_keyMapModeLabel->show();
+        QTimer::singleShot(1200, this, [this]() {
+            if (m_keyMapModeLabel) {
+                m_keyMapModeLabel->hide();
+            }
+        });
+    }
 }
 
 void VideoForm::onFrame(int width, int height, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV, int linesizeY, int linesizeU, int linesizeV)
@@ -582,6 +762,7 @@ void VideoForm::mousePressEvent(QMouseEvent *event)
 #endif
 
     if (m_videoWidget->geometry().contains(event->pos())) {
+        setFocus(Qt::MouseFocusReason);
         if (!device) {
             return;
         }
@@ -742,6 +923,129 @@ void VideoForm::keyReleaseEvent(QKeyEvent *event)
     emit device->keyEvent(event, m_videoWidget->frameSize(), m_videoWidget->size());
 }
 
+void VideoForm::parseKeyMapOverlayItems(const QString &script)
+{
+    QVector<KeyMapOverlayItem> items;
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(script.toUtf8(), &error);
+    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+        if (m_keyMapOverlay) {
+            m_keyMapOverlay->setItems(items);
+            m_keyMapOverlay->hide();
+        }
+        return;
+    }
+
+    QJsonObject root = doc.object();
+    QJsonObject mouse = root.value("mouseMoveMap").toObject();
+    QJsonObject mousePos = mouse.value("startPos").toObject();
+    if (mousePos.contains("x") && mousePos.contains("y")) {
+        KeyMapOverlayItem item;
+        item.type = "mouseMoveMap";
+        item.label = "Mouse";
+        item.start = QPointF(mousePos.value("x").toDouble(), mousePos.value("y").toDouble());
+        items << item;
+    }
+
+    QJsonObject smallEyes = mouse.value("smallEyes").toObject();
+    QJsonObject smallEyesPos = smallEyes.value("pos").toObject();
+    if (smallEyesPos.contains("x") && smallEyesPos.contains("y")) {
+        KeyMapOverlayItem item;
+        item.type = smallEyes.value("type").toString("KMT_CLICK");
+        item.label = displayKeyName(smallEyes.value("key").toString("Key_Alt"));
+        item.start = QPointF(smallEyesPos.value("x").toDouble(), smallEyesPos.value("y").toDouble());
+        items << item;
+    }
+
+    QJsonArray nodes = root.value("keyMapNodes").toArray();
+    for (int i = 0; i < nodes.size(); ++i) {
+        QJsonObject node = nodes.at(i).toObject();
+        QString type = node.value("type").toString();
+        QString key = node.value("key").toString();
+
+        if (type == "KMT_CLICK" || type == "KMT_CLICK_TWICE") {
+            QJsonObject pos = node.value("pos").toObject();
+            if (!pos.contains("x") || !pos.contains("y")) {
+                continue;
+            }
+            KeyMapOverlayItem item;
+            item.type = type;
+            item.label = displayKeyName(key);
+            item.start = QPointF(pos.value("x").toDouble(), pos.value("y").toDouble());
+            items << item;
+        } else if (type == "KMT_DRAG") {
+            QJsonObject start = node.value("startPos").toObject();
+            QJsonObject end = node.value("endPos").toObject();
+            if (!start.contains("x") || !start.contains("y") || !end.contains("x") || !end.contains("y")) {
+                continue;
+            }
+            KeyMapOverlayItem item;
+            item.type = type;
+            item.label = displayKeyName(key);
+            item.start = QPointF(start.value("x").toDouble(), start.value("y").toDouble());
+            item.end = QPointF(end.value("x").toDouble(), end.value("y").toDouble());
+            item.hasEnd = true;
+            items << item;
+        } else if (type == "KMT_CLICK_MULTI") {
+            QJsonArray clicks = node.value("clickNodes").toArray();
+            for (int clickIndex = 0; clickIndex < clicks.size(); ++clickIndex) {
+                QJsonObject click = clicks.at(clickIndex).toObject();
+                QJsonObject pos = click.value("pos").toObject();
+                if (!pos.contains("x") || !pos.contains("y")) {
+                    continue;
+                }
+                KeyMapOverlayItem item;
+                item.type = type;
+                item.label = QString("%1.%2").arg(displayKeyName(key)).arg(clickIndex + 1);
+                item.start = QPointF(pos.value("x").toDouble(), pos.value("y").toDouble());
+                items << item;
+            }
+        } else if (type == "KMT_STEER_WHEEL") {
+            QJsonObject center = node.value("centerPos").toObject();
+            if (!center.contains("x") || !center.contains("y")) {
+                continue;
+            }
+            double x = center.value("x").toDouble();
+            double y = center.value("y").toDouble();
+            double leftOffset = node.value("leftOffset").toDouble(0.1);
+            double rightOffset = node.value("rightOffset").toDouble(0.1);
+            double upOffset = node.value("upOffset").toDouble(0.1);
+            double downOffset = node.value("downOffset").toDouble(0.1);
+
+            KeyMapOverlayItem up;
+            up.type = type;
+            up.label = displayKeyName(node.value("upKey").toString("Key_W"));
+            up.start = QPointF(bound01(x), bound01(y - upOffset));
+            items << up;
+
+            KeyMapOverlayItem left;
+            left.type = type;
+            left.label = displayKeyName(node.value("leftKey").toString("Key_A"));
+            left.start = QPointF(bound01(x - leftOffset), bound01(y));
+            items << left;
+
+            KeyMapOverlayItem down;
+            down.type = type;
+            down.label = displayKeyName(node.value("downKey").toString("Key_S"));
+            down.start = QPointF(bound01(x), bound01(y + downOffset));
+            items << down;
+
+            KeyMapOverlayItem right;
+            right.type = type;
+            right.label = displayKeyName(node.value("rightKey").toString("Key_D"));
+            right.start = QPointF(bound01(x + rightOffset), bound01(y));
+            items << right;
+        }
+    }
+
+    if (m_keyMapOverlay) {
+        m_keyMapOverlay->setItems(items);
+        m_keyMapOverlay->setVisible(m_keyMapOverlayVisible && !items.isEmpty());
+        m_keyMapOverlay->raise();
+    }
+    updateKeyMapOverlayGeometry();
+}
+
 void VideoForm::paintEvent(QPaintEvent *paint)
 {
     Q_UNUSED(paint)
@@ -768,6 +1072,7 @@ void VideoForm::showEvent(QShowEvent *event)
 void VideoForm::resizeEvent(QResizeEvent *event)
 {
     Q_UNUSED(event)
+    updateKeyMapOverlayGeometry();
     QSize goodSize = ui->keepRatioWidget->goodSize();
     if (goodSize.isEmpty()) {
         return;
@@ -791,15 +1096,36 @@ void VideoForm::resizeEvent(QResizeEvent *event)
     }
 }
 
+void VideoForm::updateKeyMapOverlayGeometry()
+{
+    if (!m_keyMapOverlay || !m_videoWidget) {
+        return;
+    }
+    m_keyMapOverlay->setGeometry(m_videoWidget->geometry());
+    m_keyMapOverlay->raise();
+}
+
 void VideoForm::closeEvent(QCloseEvent *event)
 {
     Q_UNUSED(event)
     auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
     if (!device) {
+        grabCursor(false);
         return;
     }
+    device->releaseAllTouches();
+    grabCursor(false);
     Config::getInstance().setRect(device->getSerial(), geometry());
     device->disconnectDevice();
+}
+
+void VideoForm::focusOutEvent(QFocusEvent *event)
+{
+    QWidget::focusOutEvent(event);
+    auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
+    if (device) {
+        device->releaseAllTouches();
+    }
 }
 
 void VideoForm::dragEnterEvent(QDragEnterEvent *event)

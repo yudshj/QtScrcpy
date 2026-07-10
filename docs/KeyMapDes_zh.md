@@ -73,13 +73,23 @@
     - rightOffset 按下右方向键后模拟拖动到相对centerPos位置水平偏右rightOffset处
     - upOffset 按下上方向键后模拟拖动到相对centerPos位置水平偏上upOffset处
     - downOffset 按下下方向键后模拟拖动到相对centerPos位置水平偏下downOffset处
+
+### 和平精英 gp-hyd.json 调校
+
+`keymap/gp-hyd.json` 是当前和平精英调校基线：
+- `switchKey` 使用 `Key_QuoteLeft`，也就是键盘左上角的 `` ` / ~ `` 键，用于切换普通控制模式和自定义映射模式。
+- `WASD` 通过 `KMT_STEER_WHEEL` 控制左侧方向摇杆。
+- `mouseMoveMap.startPos` 当前为 `{ "x": 0.5, "y": 0.42 }`，也就是屏幕正中间偏上的位置，用于视角拖动起点。
+- keymap 可视化覆盖层默认隐藏，视频窗口侧边栏的键盘图标可以显示或隐藏覆盖层，也可以按 `Ctrl+K` 切换。
     
 ## 可视化按键映射工具
-1. 直接使用[QuickAssistant](https://lrbnfell4p.feishu.cn/drive/folder/Hqckfxj5el1Wjpd9uezcX71lnBh)
+1. QtScrcpy 内置可视化覆盖层和编辑入口：选择脚本并点击“应用脚本”后，视频窗口会加载当前脚本；侧边栏键盘图标用于显示或隐藏按键覆盖层，默认隐藏以避免遮挡游戏画面。
+
+2. 直接使用[QuickAssistant](https://lrbnfell4p.feishu.cn/drive/folder/Hqckfxj5el1Wjpd9uezcX71lnBh)
 
 ![game](../screenshot/game.png)
 
-2. 还有一个基于Web的GUI工具可以帮助你直观地创建和管理按键映射：[ScrcpyKeyMapper](https://github.com/w4po/ScrcpyKeyMapper)
+3. 还有一个基于Web的GUI工具可以帮助你直观地创建和管理按键映射：[ScrcpyKeyMapper](https://github.com/w4po/ScrcpyKeyMapper)
 
 ![ScrcpyKeyMapper截图](https://raw.githubusercontent.com/w4po/ScrcpyKeyMapper/main/assets/screenshot.png)
 
