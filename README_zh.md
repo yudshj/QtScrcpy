@@ -13,6 +13,8 @@
 
 QtScrcpy 可以通过 USB / 网络连接Android设备，并进行显示和控制。无需root权限。
 
+默认使用设备原生分辨率和 12 Mbps 视频码率；可在主界面按设备性能和 USB/Wi-Fi 链路情况调整。
+
 同时支持 GNU/Linux ，Windows 和 MacOS 三大主流桌面平台。
 
 它专注于:
