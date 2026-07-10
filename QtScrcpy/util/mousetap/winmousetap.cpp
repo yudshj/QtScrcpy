@@ -12,10 +12,10 @@ void WinMouseTap::initMouseEventTap() {}
 
 void WinMouseTap::quitMouseEventTap() {}
 
-void WinMouseTap::enableMouseEventTap(QRect rc, bool enabled)
+bool WinMouseTap::enableMouseEventTap(QRect rc, bool enabled)
 {
     if (enabled && rc.isEmpty()) {
-        return;
+        return false;
     }
     if (enabled) {
         RECT mainRect;
@@ -23,8 +23,8 @@ void WinMouseTap::enableMouseEventTap(QRect rc, bool enabled)
         mainRect.right = (LONG)rc.right();
         mainRect.top = (LONG)rc.top();
         mainRect.bottom = (LONG)rc.bottom();
-        ClipCursor(&mainRect);
+        return ClipCursor(&mainRect) != 0;
     } else {
-        ClipCursor(Q_NULLPTR);
+        return ClipCursor(Q_NULLPTR) != 0;
     }
 }

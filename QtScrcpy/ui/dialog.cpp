@@ -45,16 +45,40 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
             QMessageBox::warning(this, tr("Keymap Editor"), tr("Please select a script first."));
             return;
         }
-        KeyMapEditorDialog editor(getKeyMapPath() + "/" + fileName, this);
+        const QString serial = ui->serialBox->currentText().trimmed();
+        auto captureFrame = [serial]() -> QImage {
+            auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+            return device ? device->currentFrame() : QImage();
+        };
+        KeyMapEditorDialog editor(getKeyMapPath() + "/" + fileName, captureFrame, this);
         editor.exec();
-        auto device = qsc::IDeviceManage::getInstance().getDevice(ui->serialBox->currentText().trimmed());
-        if (device) {
-            QString script = getGameScript(fileName);
-            device->updateScript(script);
-            auto data = device->getUserData();
-            if (data) {
-                static_cast<VideoForm*>(data)->setKeyMapScript(script);
-            }
+        if (!editor.wasSaved()) {
+            return;
+        }
+
+        on_refreshGameScriptBtn_clicked();
+        const QString savedName = QFileInfo(editor.scriptPath()).fileName();
+        const int savedIndex = ui->gameBox->findText(savedName);
+        if (savedIndex < 0) {
+            QMessageBox::warning(this, tr("Keymap Editor"), tr("Save the script inside the keymap directory before applying it."));
+            return;
+        }
+        ui->gameBox->setCurrentIndex(savedIndex);
+
+        auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+        if (!device) {
+            return;
+        }
+        QFile savedFile(editor.scriptPath());
+        if (!savedFile.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(this, tr("Keymap Editor"), tr("Open file failed:\n%1").arg(editor.scriptPath()));
+            return;
+        }
+        const QString script = QString::fromUtf8(savedFile.readAll());
+        device->updateScript(script);
+        auto data = device->getUserData();
+        if (data) {
+            static_cast<VideoForm*>(data)->setKeyMapScript(script);
         }
     });
 

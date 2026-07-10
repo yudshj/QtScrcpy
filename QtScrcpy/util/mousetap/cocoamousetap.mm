@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #include <QDebug>
+#include <QMutex>
+#include <QMutexLocker>
 
 #include "cocoamousetap.h"
 
@@ -19,6 +21,7 @@ typedef struct MouseEventTapData{
     CFMachPortRef tap = Q_NULLPTR;
     CFRunLoopRef runloop = Q_NULLPTR;
     CFRunLoopSourceRef runloopSource = Q_NULLPTR;
+    QMutex mutex;
     QRect rc;
 } MouseEventTapData;
 
@@ -34,6 +37,7 @@ static CGEventRef Cocoa_MouseTapCallback(CGEventTapProxy proxy, CGEventType type
             }
         case kCGEventTapDisabledByUserInput:
             {
+                CGEventTapEnable(tapdata->tap, true);
                 return nullptr;
             }
         default:
@@ -41,15 +45,17 @@ static CGEventRef Cocoa_MouseTapCallback(CGEventTapProxy proxy, CGEventType type
     }
 
 
-    if (tapdata->rc.isEmpty()) {
+    QRect rc;
+    {
+        QMutexLocker locker(&tapdata->mutex);
+        rc = tapdata->rc;
+    }
+    if (rc.isEmpty()) {
         return event;
     }
 
-    NSRect limitWindowRect = NSMakeRect(tapdata->rc.left(), tapdata->rc.top(),
-                                   tapdata->rc.width(), tapdata->rc.height());
-    // check rect samll than limit rect
-    NSRect checkWindowRect = NSMakeRect(limitWindowRect.origin.x + 10, limitWindowRect.origin.y + 10,
-                            limitWindowRect.size.width - 10, limitWindowRect.size.height - 10);
+    NSRect limitWindowRect = NSMakeRect(rc.left(), rc.top(), rc.width(), rc.height());
+    NSRect checkWindowRect = NSInsetRect(limitWindowRect, 10, 10);
     /* This is in CGs global screenspace coordinate system, which has a
      * flipped Y.
      */
@@ -116,6 +122,7 @@ void CocoaMouseTap::initMouseEventTap()
                                       kCGEventTapOptionDefault, allGrabbedEventsMask,
                                       &Cocoa_MouseTapCallback, m_tapData);
     if (!m_tapData->tap) {
+        qWarning() << "Unable to create macOS mouse event tap. Grant QtScrcpy Input Monitoring permission and restart it.";
         return;
     }
     /* Tap starts disabled, until app requests mouse grab */
@@ -148,13 +155,17 @@ void CocoaMouseTap::quitMouseEventTap()
     }
 }
 
-void CocoaMouseTap::enableMouseEventTap(QRect rc, bool enabled)
+bool CocoaMouseTap::enableMouseEventTap(QRect rc, bool enabled)
 {
-    if (m_tapData && m_tapData->tap)
-    {
-        enabled ? m_tapData->rc = rc : m_tapData->rc = QRect();
-        CGEventTapEnable(m_tapData->tap, enabled);
+    if (!m_tapData || !m_tapData->tap || (enabled && rc.isEmpty())) {
+        return false;
     }
+    {
+        QMutexLocker locker(&m_tapData->mutex);
+        m_tapData->rc = enabled ? rc : QRect();
+    }
+    CGEventTapEnable(m_tapData->tap, enabled);
+    return !enabled || CGEventTapIsEnabled(m_tapData->tap);
 }
 
 void CocoaMouseTap::run()

@@ -27,6 +27,9 @@ static void find_grab_window_recursive(xcb_connection_t *dpy, xcb_window_t windo
     xcb_query_tree_reply_t *tree;
     tree_cookie = xcb_query_tree(dpy, window);
     tree = xcb_query_tree_reply(dpy, tree_cookie, NULL);
+    if (!tree) {
+        return;
+    }
 
     xcb_window_t *children = xcb_query_tree_children(tree);
     for (int i = 0; i < xcb_query_tree_children_length(tree); i++) {
@@ -34,6 +37,9 @@ static void find_grab_window_recursive(xcb_connection_t *dpy, xcb_window_t windo
         xcb_get_geometry_reply_t *gg;
         gg_cookie = xcb_get_geometry(dpy, children[i]);
         gg = xcb_get_geometry_reply(dpy, gg_cookie, NULL);
+        if (!gg) {
+            continue;
+        }
 
         if (gg->x + offset_x <= rc.left() && gg->x + offset_x + gg->width >= rc.right() &&
                 gg->y + offset_y <= rc.top() && gg->y + offset_y + gg->height >= rc.bottom()) {
@@ -53,12 +59,15 @@ static void find_grab_window_recursive(xcb_connection_t *dpy, xcb_window_t windo
     free(tree);
 }
 
-void XMouseTap::enableMouseEventTap(QRect rc, bool enabled) {
+bool XMouseTap::enableMouseEventTap(QRect rc, bool enabled) {
     if (enabled && rc.isEmpty()) {
-        return;
+        return false;
     }
 
     xcb_connection_t *dpy = QX11Info::connection();
+    if (!dpy) {
+        return false;
+    }
 
     if (enabled) {
         // We grab the top-most smallest window
@@ -77,14 +86,19 @@ void XMouseTap::enableMouseEventTap(QRect rc, bool enabled) {
                     grab_window, XCB_NONE, XCB_CURRENT_TIME);
             grab = xcb_grab_pointer_reply(dpy, grab_cookie, NULL);
 
+            const bool success = grab && grab->status == XCB_GRAB_STATUS_SUCCESS;
             free(grab);
+            return success;
         }
+        return false;
     } else {
         xcb_void_cookie_t ungrab_cookie;
         xcb_generic_error_t *error;
         ungrab_cookie = xcb_ungrab_pointer_checked(dpy, XCB_CURRENT_TIME);
         error = xcb_request_check(dpy, ungrab_cookie);
 
+        const bool success = error == NULL;
         free(error);
+        return success;
     }
 }

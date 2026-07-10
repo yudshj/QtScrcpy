@@ -700,10 +700,17 @@ void VideoForm::updateFPS(quint32 fps)
 void VideoForm::grabCursor(bool grab)
 {
     QRect rc = getGrabCursorRect();
-    MouseTap::getInstance()->enableMouseEventTap(rc, grab);
+    const bool captureSucceeded = MouseTap::getInstance()->enableMouseEventTap(rc, grab);
+    if (grab && !captureSucceeded) {
+        qWarning() << "Cursor capture failed; leaving custom keymap mode";
+        auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
+        if (device) {
+            device->releaseAllTouches();
+        }
+    }
 
     if (m_keyMapModeLabel) {
-        m_keyMapModeLabel->setText(grab ? tr("KEYMAP ON") : tr("KEYMAP OFF"));
+        m_keyMapModeLabel->setText(grab ? (captureSucceeded ? tr("KEYMAP ON") : tr("CURSOR CAPTURE FAILED")) : tr("KEYMAP OFF"));
         m_keyMapModeLabel->adjustSize();
         m_keyMapModeLabel->move(qMax(0, (m_videoWidget->width() - m_keyMapModeLabel->width()) / 2), 20);
         m_keyMapModeLabel->raise();
@@ -772,8 +779,8 @@ void VideoForm::mousePressEvent(QMouseEvent *event)
 
         // debug keymap pos
         if (event->button() == Qt::LeftButton) {
-            qreal x = localPos.x() / m_videoWidget->size().width();
-            qreal y = localPos.y() / m_videoWidget->size().height();
+            qreal x = mappedPos.x() / m_videoWidget->size().width();
+            qreal y = mappedPos.y() / m_videoWidget->size().height();
             QString posTip = QString(R"("pos": {"x": %1, "y": %2})").arg(x).arg(y);
             qInfo() << posTip.toStdString().c_str();
         }

@@ -3,9 +3,11 @@
 
 #include <QDialog>
 #include <QGraphicsEllipseItem>
+#include <QImage>
 #include <QJsonDocument>
 #include <QMap>
 #include <QPixmap>
+#include <functional>
 
 class QCheckBox;
 class QDoubleSpinBox;
@@ -17,6 +19,7 @@ class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
 class QPushButton;
+class QCloseEvent;
 
 class KeyMapEditorDialog;
 
@@ -39,12 +42,18 @@ class KeyMapEditorDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit KeyMapEditorDialog(const QString &scriptPath, QWidget *parent = 0);
+    explicit KeyMapEditorDialog(const QString &scriptPath, const std::function<QImage()> &captureFrame, QWidget *parent = 0);
 
     void pointMoved(const QString &path, const QPointF &scenePos);
+    QString scriptPath() const;
+    bool wasSaved() const;
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void loadBackground();
+    void captureBackground();
     void saveScript();
     void saveScriptAs();
     void selectFromList(QListWidgetItem *item);
@@ -72,6 +81,8 @@ private:
 
     bool loadScript();
     bool writeScript(const QString &path);
+    void setDirty(bool dirty = true);
+    void setBackground(const QImage &image);
     void buildUi();
     void rebuildScene();
     void rebuildPointList();
@@ -92,8 +103,11 @@ private:
     void setStatus(const QString &text);
 
     QString m_scriptPath;
+    std::function<QImage()> m_captureFrame;
     QJsonDocument m_doc;
     bool m_updating = false;
+    bool m_dirty = false;
+    bool m_wasSaved = false;
     bool m_showGrid = true;
     bool m_showLabels = true;
     QSizeF m_canvasSize = QSizeF(1280, 720);

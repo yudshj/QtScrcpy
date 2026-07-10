@@ -35,7 +35,7 @@ const QSize KeepRatioWidget::goodSize()
 
 void KeepRatioWidget::resizeEvent(QResizeEvent *event)
 {
-    Q_UNUSED(event)
+    QWidget::resizeEvent(event);
     adjustSubWidget();
 }
 
@@ -49,16 +49,17 @@ void KeepRatioWidget::adjustSubWidget()
     QPoint pos(0, 0);
     int width = 0;
     int height = 0;
-    if (m_widthHeightRatio > 1.0f) {
-        // base width
-        width = curSize.width();
-        height = curSize.width() / m_widthHeightRatio;
-        pos.setY((curSize.height() - height) / 2);
-    } else if (m_widthHeightRatio > 0.0f) {
-        // base height
-        height = curSize.height();
-        width = curSize.height() * m_widthHeightRatio;
-        pos.setX((curSize.width() - width) / 2);
+    if (m_widthHeightRatio > 0.0f && !curSize.isEmpty()) {
+        const float containerRatio = static_cast<float>(curSize.width()) / curSize.height();
+        if (containerRatio > m_widthHeightRatio) {
+            height = curSize.height();
+            width = qRound(height * m_widthHeightRatio);
+            pos.setX((curSize.width() - width) / 2);
+        } else {
+            width = curSize.width();
+            height = qRound(width / m_widthHeightRatio);
+            pos.setY((curSize.height() - height) / 2);
+        }
     } else {
         // full widget
         height = curSize.height();

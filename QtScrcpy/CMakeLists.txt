@@ -328,9 +328,6 @@ endif()
 
 # MacOS
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # qt6 need 10.15 or later
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-
     # copy bundle file
     get_target_property(MACOS_BUNDLE_PATH ${PROJECT_NAME} RUNTIME_OUTPUT_DIRECTORY)
     set(MACOS_BUNDLE_PATH ${MACOS_BUNDLE_PATH}/${PROJECT_NAME}.app/Contents)

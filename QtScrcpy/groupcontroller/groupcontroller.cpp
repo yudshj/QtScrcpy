@@ -10,7 +10,11 @@ GroupController::GroupController(QObject *parent) : QObject(parent)
 
 bool GroupController::isHost(const QString &serial)
 {
-    auto data = qsc::IDeviceManage::getInstance().getDevice(serial)->getUserData();
+    auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+    if (!device) {
+        return true;
+    }
+    auto data = device->getUserData();
     if (!data) {
         return true;
     }
@@ -20,7 +24,11 @@ bool GroupController::isHost(const QString &serial)
 
 QSize GroupController::getFrameSize(const QString &serial)
 {
-    auto data = qsc::IDeviceManage::getInstance().getDevice(serial)->getUserData();
+    auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+    if (!device) {
+        return QSize();
+    }
+    auto data = device->getUserData();
     if (!data) {
         return QSize();
     }
@@ -124,6 +132,19 @@ void GroupController::keyEvent(const QKeyEvent *from, const QSize &frameSize, co
         }
 
         device->keyEvent(from, getFrameSize(serial), showSize);
+    }
+}
+
+void GroupController::releaseAllTouches()
+{
+    for (const auto &serial : m_devices) {
+        if (isHost(serial)) {
+            continue;
+        }
+        auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+        if (device) {
+            device->releaseAllTouches();
+        }
     }
 }
 

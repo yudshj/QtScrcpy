@@ -1,6 +1,7 @@
 #include "keymapeditordialog.h"
 
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
@@ -19,6 +20,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -57,8 +59,8 @@ void KeyMapPointItem::setLabelText(const QString &label)
     }
 }
 
-KeyMapEditorDialog::KeyMapEditorDialog(const QString &scriptPath, QWidget *parent)
-    : QDialog(parent), m_scriptPath(scriptPath)
+KeyMapEditorDialog::KeyMapEditorDialog(const QString &scriptPath, const std::function<QImage()> &captureFrame, QWidget *parent)
+    : QDialog(parent), m_scriptPath(scriptPath), m_captureFrame(captureFrame)
 {
     buildUi();
     if (loadScript()) {
@@ -66,6 +68,19 @@ KeyMapEditorDialog::KeyMapEditorDialog(const QString &scriptPath, QWidget *paren
         rebuildPointList();
         setStatus(tr("Loaded %1").arg(scriptPath));
     }
+    if (m_captureFrame) {
+        setBackground(m_captureFrame());
+    }
+}
+
+QString KeyMapEditorDialog::scriptPath() const
+{
+    return m_scriptPath;
+}
+
+bool KeyMapEditorDialog::wasSaved() const
+{
+    return m_wasSaved;
 }
 
 void KeyMapEditorDialog::buildUi()
@@ -114,12 +129,14 @@ void KeyMapEditorDialog::buildUi()
     form->addRow(tr("Y"), m_ySpin);
 
     QPushButton *backgroundBtn = new QPushButton(tr("Load background"), this);
+    QPushButton *captureBtn = new QPushButton(tr("Capture current frame"), this);
     QPushButton *addClickBtn = new QPushButton(tr("Add click"), this);
     QPushButton *addDragBtn = new QPushButton(tr("Add drag"), this);
     QPushButton *deleteBtn = new QPushButton(tr("Delete"), this);
     QPushButton *saveBtn = new QPushButton(tr("Save"), this);
     QPushButton *saveAsBtn = new QPushButton(tr("Save as"), this);
     connect(backgroundBtn, &QPushButton::clicked, this, &KeyMapEditorDialog::loadBackground);
+    connect(captureBtn, &QPushButton::clicked, this, &KeyMapEditorDialog::captureBackground);
     connect(addClickBtn, &QPushButton::clicked, this, &KeyMapEditorDialog::addClickNode);
     connect(addDragBtn, &QPushButton::clicked, this, &KeyMapEditorDialog::addDragNode);
     connect(deleteBtn, &QPushButton::clicked, this, &KeyMapEditorDialog::deleteSelectedNode);
@@ -135,6 +152,7 @@ void KeyMapEditorDialog::buildUi()
 
     QHBoxLayout *toolLayout = new QHBoxLayout;
     toolLayout->addWidget(backgroundBtn);
+    toolLayout->addWidget(captureBtn);
     toolLayout->addWidget(m_gridCheck);
     toolLayout->addWidget(m_labelCheck);
     toolLayout->addWidget(addClickBtn);
@@ -191,17 +209,28 @@ bool KeyMapEditorDialog::loadScript()
     if (m_switchKeyEdit) {
         m_switchKeyEdit->setText(m_doc.object().value("switchKey").toString());
     }
+    setDirty(false);
     return true;
 }
 
 bool KeyMapEditorDialog::writeScript(const QString &path)
 {
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    updateSwitchKey();
+    updateSelectedFields();
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
         QMessageBox::warning(this, tr("Keymap Editor"), tr("Write file failed:\n%1").arg(path));
         return false;
     }
-    file.write(m_doc.toJson(QJsonDocument::Indented));
+    const QByteArray data = m_doc.toJson(QJsonDocument::Indented);
+    if (file.write(data) != data.size() || !file.commit()) {
+        QMessageBox::warning(this, tr("Keymap Editor"), tr("Write file failed:\n%1").arg(path));
+        return false;
+    }
+    m_scriptPath = path;
+    m_wasSaved = true;
+    setDirty(false);
     setStatus(tr("Saved %1").arg(path));
     return true;
 }
@@ -215,6 +244,9 @@ void KeyMapEditorDialog::saveScriptAs()
 {
     QString path = QFileDialog::getSaveFileName(this, tr("Save keymap"), m_scriptPath, tr("JSON (*.json)"));
     if (!path.isEmpty()) {
+        if (!path.endsWith(".json", Qt::CaseInsensitive)) {
+            path += ".json";
+        }
         writeScript(path);
     }
 }
@@ -235,6 +267,31 @@ void KeyMapEditorDialog::loadBackground()
     m_canvasSize = m_background.size();
     rebuildScene();
     setStatus(tr("Background loaded %1").arg(path));
+}
+
+void KeyMapEditorDialog::captureBackground()
+{
+    if (!m_captureFrame) {
+        QMessageBox::warning(this, tr("Keymap Editor"), tr("No connected video source."));
+        return;
+    }
+    const QImage image = m_captureFrame();
+    if (image.isNull()) {
+        QMessageBox::warning(this, tr("Keymap Editor"), tr("No decoded frame is available yet."));
+        return;
+    }
+    setBackground(image);
+    setStatus(tr("Captured current mirrored frame"));
+}
+
+void KeyMapEditorDialog::setBackground(const QImage &image)
+{
+    if (image.isNull()) {
+        return;
+    }
+    m_background = QPixmap::fromImage(image);
+    m_canvasSize = image.size();
+    rebuildScene();
 }
 
 void KeyMapEditorDialog::rebuildScene()
@@ -515,6 +572,7 @@ void KeyMapEditorDialog::addClickNode()
     nodes.append(node);
     root.insert("keyMapNodes", nodes);
     m_doc.setObject(root);
+    setDirty();
 
     QString path = QString("keyMapNodes.%1.pos").arg(nodes.size() - 1);
     rebuildPointList();
@@ -544,6 +602,7 @@ void KeyMapEditorDialog::addDragNode()
     nodes.append(node);
     root.insert("keyMapNodes", nodes);
     m_doc.setObject(root);
+    setDirty();
 
     QString path = QString("keyMapNodes.%1.startPos").arg(nodes.size() - 1);
     rebuildPointList();
@@ -577,6 +636,7 @@ void KeyMapEditorDialog::deleteSelectedNode()
     }
 
     m_doc.setObject(root);
+    setDirty();
     rebuildPointList();
     rebuildScene();
 }
@@ -589,6 +649,7 @@ void KeyMapEditorDialog::updateSwitchKey()
     QJsonObject root = m_doc.object();
     root.insert("switchKey", m_switchKeyEdit->text());
     m_doc.setObject(root);
+    setDirty();
 }
 
 void KeyMapEditorDialog::toggleGrid(bool checked)
@@ -639,6 +700,7 @@ void KeyMapEditorDialog::setPointInDocument(const QString &path, double x, doubl
         root.insert("keyMapNodes", nodes);
     }
     m_doc.setObject(root);
+    setDirty();
 }
 
 void KeyMapEditorDialog::setFieldInDocument(const QString &path, const QString &field, const QString &value)
@@ -664,6 +726,7 @@ void KeyMapEditorDialog::setFieldInDocument(const QString &path, const QString &
         root.insert("keyMapNodes", nodes);
     }
     m_doc.setObject(root);
+    setDirty();
 }
 
 void KeyMapEditorDialog::setBoolFieldInDocument(const QString &path, const QString &field, bool value)
@@ -687,6 +750,7 @@ void KeyMapEditorDialog::setBoolFieldInDocument(const QString &path, const QStri
         root.insert("keyMapNodes", nodes);
     }
     m_doc.setObject(root);
+    setDirty();
 }
 
 void KeyMapEditorDialog::updateItemPosition(const QString &path, double x, double y)
@@ -753,4 +817,34 @@ bool KeyMapEditorDialog::boolFieldForPath(const QString &path, const QString &fi
 void KeyMapEditorDialog::setStatus(const QString &text)
 {
     m_status->setText(text);
+}
+
+void KeyMapEditorDialog::setDirty(bool dirty)
+{
+    m_dirty = dirty;
+    setWindowTitle(tr("Keymap Editor") + (m_dirty ? " *" : ""));
+}
+
+void KeyMapEditorDialog::closeEvent(QCloseEvent *event)
+{
+    if (!m_dirty) {
+        event->accept();
+        return;
+    }
+
+    const QMessageBox::StandardButton choice = QMessageBox::question(
+        this,
+        tr("Keymap Editor"),
+        tr("Save changes before closing?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Save);
+    if (choice == QMessageBox::Cancel) {
+        event->ignore();
+        return;
+    }
+    if (choice == QMessageBox::Save && !writeScript(m_scriptPath)) {
+        event->ignore();
+        return;
+    }
+    event->accept();
 }
