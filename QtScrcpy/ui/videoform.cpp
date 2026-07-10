@@ -710,7 +710,15 @@ void VideoForm::grabCursor(bool grab)
     }
 
     if (m_keyMapModeLabel) {
-        m_keyMapModeLabel->setText(grab ? (captureSucceeded ? tr("KEYMAP ON") : tr("CURSOR CAPTURE FAILED")) : tr("KEYMAP OFF"));
+        QString modeText = tr("KEYMAP OFF");
+        if (grab) {
+#ifdef Q_OS_MACOS
+            modeText = captureSucceeded ? tr("KEYMAP ON") : tr("ACCESSIBILITY PERMISSION REQUIRED");
+#else
+            modeText = captureSucceeded ? tr("KEYMAP ON") : tr("CURSOR CAPTURE FAILED");
+#endif
+        }
+        m_keyMapModeLabel->setText(modeText);
         m_keyMapModeLabel->adjustSize();
         m_keyMapModeLabel->move(qMax(0, (m_videoWidget->width() - m_keyMapModeLabel->width()) / 2), 20);
         m_keyMapModeLabel->raise();

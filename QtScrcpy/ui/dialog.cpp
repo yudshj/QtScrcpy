@@ -1,6 +1,8 @@
 ﻿#include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QPushButton>
 #include <QRandomGenerator>
@@ -14,6 +16,10 @@
 #include "videoform.h"
 #include "../groupcontroller/groupcontroller.h"
 
+#ifdef Q_OS_OSX
+#include "../util/path.h"
+#endif
+
 #ifdef Q_OS_WIN32
 #include "../util/winutils.h"
 #endif
@@ -26,7 +32,27 @@ const QString &getKeyMapPath()
         s_keyMapPath = QString::fromLocal8Bit(qgetenv("QTSCRCPY_KEYMAP_PATH"));
         QFileInfo fileInfo(s_keyMapPath);
         if (s_keyMapPath.isEmpty() || !fileInfo.isDir()) {
+#ifdef Q_OS_OSX
+            const QString bundledPath = QCoreApplication::applicationDirPath() + "/keymap";
+            const QString writableRoot = Path::GetApplicationSupportPath();
+            const QString writablePath = writableRoot.isEmpty() ? QString() : writableRoot + "/keymap";
+            if (!writablePath.isEmpty() && (QDir(writablePath).exists() || QDir().mkpath(writablePath))) {
+                QDir bundledDir(bundledPath);
+                const QStringList scripts = bundledDir.entryList(QStringList() << "*.json", QDir::Files);
+                for (const QString &script : scripts) {
+                    const QString destination = QDir(writablePath).filePath(script);
+                    if (!QFileInfo::exists(destination) && !QFile::copy(bundledDir.filePath(script), destination)) {
+                        qWarning() << "Unable to install default keymap:" << destination;
+                    }
+                }
+                s_keyMapPath = writablePath;
+            } else {
+                qWarning() << "Unable to create writable keymap directory:" << writablePath;
+                s_keyMapPath = bundledPath;
+            }
+#else
             s_keyMapPath = QCoreApplication::applicationDirPath() + "/keymap";
+#endif
         }
     }
     return s_keyMapPath;

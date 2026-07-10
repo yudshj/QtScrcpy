@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <ApplicationServices/ApplicationServices.h>
 #include <QDebug>
 #include <QMutex>
 #include <QMutexLocker>
@@ -16,6 +17,29 @@ static const CGEventMask allGrabbedEventsMask =
     | CGEventMaskBit(kCGEventOtherMouseDown)   | CGEventMaskBit(kCGEventOtherMouseUp)
     | CGEventMaskBit(kCGEventLeftMouseDragged) | CGEventMaskBit(kCGEventRightMouseDragged)
     | CGEventMaskBit(kCGEventMouseMoved);
+
+static bool hasAccessibilityPermission(bool prompt)
+{
+    if (!prompt) {
+        return AXIsProcessTrusted();
+    }
+
+    const void *keys[] = { kAXTrustedCheckOptionPrompt };
+    const void *values[] = { kCFBooleanTrue };
+    CFDictionaryRef options = CFDictionaryCreate(
+        kCFAllocatorDefault,
+        keys,
+        values,
+        1,
+        &kCFCopyStringDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks);
+    if (!options) {
+        return false;
+    }
+    const bool trusted = AXIsProcessTrustedWithOptions(options);
+    CFRelease(options);
+    return trusted;
+}
 
 typedef struct MouseEventTapData{
     CFMachPortRef tap = Q_NULLPTR;
@@ -114,20 +138,32 @@ CocoaMouseTap::~CocoaMouseTap()
 
 void CocoaMouseTap::initMouseEventTap()
 {
-    if (!m_tapData) {
-        return;
-    }
+    createMouseEventTap(false);
+}
 
+bool CocoaMouseTap::createMouseEventTap(bool promptForPermission)
+{
+    if (!m_tapData) {
+        return false;
+    }
+    if (m_tapData->tap) {
+        return true;
+    }
+    if (!hasAccessibilityPermission(promptForPermission)) {
+        qWarning() << "macOS Accessibility permission is required for mouse capture.";
+        return false;
+    }
     m_tapData->tap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap,
                                       kCGEventTapOptionDefault, allGrabbedEventsMask,
                                       &Cocoa_MouseTapCallback, m_tapData);
     if (!m_tapData->tap) {
-        qWarning() << "Unable to create macOS mouse event tap. Grant QtScrcpy Input Monitoring permission and restart it.";
-        return;
+        qWarning() << "Unable to create macOS mouse event tap despite Accessibility permission.";
+        return false;
     }
     /* Tap starts disabled, until app requests mouse grab */
     CGEventTapEnable(m_tapData->tap, false);
     start();
+    return true;
 }
 
 void CocoaMouseTap::quitMouseEventTap()
@@ -157,8 +193,14 @@ void CocoaMouseTap::quitMouseEventTap()
 
 bool CocoaMouseTap::enableMouseEventTap(QRect rc, bool enabled)
 {
-    if (!m_tapData || !m_tapData->tap || (enabled && rc.isEmpty())) {
+    if (!m_tapData || (enabled && rc.isEmpty())) {
         return false;
+    }
+    if (enabled && !m_tapData->tap && !createMouseEventTap(true)) {
+        return false;
+    }
+    if (!m_tapData->tap) {
+        return !enabled;
     }
     {
         QMutexLocker locker(&m_tapData->mutex);

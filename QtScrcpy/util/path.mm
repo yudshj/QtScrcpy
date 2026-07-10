@@ -2,6 +2,21 @@
 
 #import <Cocoa/Cocoa.h>
 
-const char* Path::GetCurrentPath() {
-    return [[[NSBundle mainBundle] bundlePath] UTF8String];
+static QString fromNSString(NSString *value)
+{
+    return value ? QString::fromUtf8([value fileSystemRepresentation]) : QString();
+}
+
+QString Path::GetCurrentPath()
+{
+    return fromNSString([[NSBundle mainBundle] bundlePath]);
+}
+
+QString Path::GetApplicationSupportPath()
+{
+    NSArray<NSString *> *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    if (paths.count == 0) {
+        return QString();
+    }
+    return fromNSString([paths.firstObject stringByAppendingPathComponent:@"QtScrcpy"]);
 }

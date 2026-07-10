@@ -360,7 +360,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     )
 
     # mac framework
-    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework AppKit")
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework AppKit" "-framework ApplicationServices")
 endif()
 
 # Linux

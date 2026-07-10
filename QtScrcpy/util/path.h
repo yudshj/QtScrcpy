@@ -1,6 +1,9 @@
 #pragma once
 
+#include <QString>
+
 class Path {
 public:
-    static const char* GetCurrentPath();
+    static QString GetCurrentPath();
+    static QString GetApplicationSupportPath();
 };

@@ -23,6 +23,8 @@ protected:
     void run() override;
 
 private:
+    bool createMouseEventTap(bool promptForPermission);
+
     MouseEventTapData *m_tapData = Q_NULLPTR;
     QSemaphore m_runloopStartedSemaphore;
 };

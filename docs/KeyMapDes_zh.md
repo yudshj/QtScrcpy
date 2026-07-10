@@ -1,6 +1,6 @@
 # 自定义按键映射说明
 
-按键映射文件为json格式，新增自己的按键映射文件需要放在keymap目录中才可以被QtScrcpy识别。
+按键映射文件为json格式，新增自己的按键映射文件需要放在keymap目录中才可以被QtScrcpy识别。macOS 的可写目录是 `~/Library/Application Support/QtScrcpy/keymap`，首次运行会从应用包复制内置脚本。
 
 按键映射文件的具体编写格式下面会介绍，也可以参考自带的按键映射文件。
 

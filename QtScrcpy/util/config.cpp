@@ -1,4 +1,6 @@
 ﻿#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSettings>
 #include <QDebug>
@@ -122,8 +124,31 @@ QString Config::s_configPath = "";
 
 Config::Config(QObject *parent) : QObject(parent)
 {
-    m_settings = new QSettings(getConfigPath() + "/config.ini", QSettings::IniFormat);
-    m_userData = new QSettings(getConfigPath() + "/userdata.ini", QSettings::IniFormat);
+    const QString configPath = getConfigPath();
+    m_settings = new QSettings(configPath + "/config.ini", QSettings::IniFormat);
+
+    QString userDataPath = QString::fromLocal8Bit(qgetenv("QTSCRCPY_USERDATA_PATH"));
+#ifdef Q_OS_OSX
+    if (userDataPath.isEmpty()) {
+        userDataPath = Path::GetApplicationSupportPath();
+    }
+#else
+    if (userDataPath.isEmpty()) {
+        userDataPath = configPath;
+    }
+#endif
+    if (userDataPath.isEmpty() || (!QDir(userDataPath).exists() && !QDir().mkpath(userDataPath))) {
+        qWarning() << "Unable to create writable settings directory:" << userDataPath;
+        userDataPath = configPath;
+    }
+
+    const QString userDataFile = userDataPath + "/userdata.ini";
+    const QString legacyUserDataFile = configPath + "/userdata.ini";
+    if (!QFileInfo::exists(userDataFile) && QFileInfo::exists(legacyUserDataFile)
+        && !QFile::copy(legacyUserDataFile, userDataFile)) {
+        qWarning() << "Unable to migrate user settings to:" << userDataFile;
+    }
+    m_userData = new QSettings(userDataFile, QSettings::IniFormat);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     m_settings->setIniCodec("UTF-8");
     m_userData->setIniCodec("UTF-8");
