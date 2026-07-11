@@ -91,37 +91,15 @@ private:
 
     void drawItem(QPainter *painter, const KeyMapOverlayItem &item)
     {
-        QPointF start = toWidget(item.start);
-        QColor fill(244, 197, 66, 135);
-        QColor stroke(20, 27, 36, 180);
-        if (item.type == "KMT_STEER_WHEEL") {
-            fill = QColor(47, 128, 237, 125);
-        } else if (item.type == "mouseMoveMap") {
-            fill = QColor(155, 97, 255, 120);
-        } else if (item.hasEnd) {
-            fill = QColor(232, 92, 74, 120);
-        }
-
-        if (item.hasEnd) {
-            QPointF end = toWidget(item.end);
-            painter->setPen(QPen(QColor(255, 255, 255, 140), 3));
-            painter->drawLine(start, end);
-            painter->setBrush(QColor(232, 92, 74, 135));
-            painter->setPen(QPen(stroke, 2));
-            painter->drawEllipse(end, 10, 10);
-        }
-
-        painter->setBrush(fill);
-        painter->setPen(QPen(stroke, 2));
-        painter->drawEllipse(start, 14, 14);
-
+        const QPointF center = toWidget(item.start);
         QString text = item.label.isEmpty() ? item.type : item.label;
         QFont font = painter->font();
         font.setBold(true);
         font.setPointSize(10);
         painter->setFont(font);
         QRect textRect = painter->fontMetrics().boundingRect(text).adjusted(-8, -5, 8, 5);
-        QPoint textTopLeft(qRound(start.x() - textRect.width() / 2), qRound(start.y() - 40));
+        QPoint textTopLeft(qRound(center.x() - textRect.width() / 2),
+                            qRound(center.y() - textRect.height() / 2));
         textTopLeft.setX(qMax(2, qMin(width() - textRect.width() - 2, textTopLeft.x())));
         textTopLeft.setY(qMax(2, qMin(height() - textRect.height() - 2, textTopLeft.y())));
         textRect.moveTopLeft(textTopLeft);
