@@ -23,13 +23,13 @@
 			"comment": "方向盘",
 			"type": "KMT_STEER_WHEEL",
 			"centerPos": {
-				"x": 0.196,
-				"y": 0.67
+				"x": 0.170474,
+				"y": 0.727778
 			},
-			"leftOffset": 0.075,
-			"rightOffset": 0.075,
-			"upOffset": 0.095,
-			"downOffset": 0.095,
+			"leftOffset": 0.109137,
+			"rightOffset": 0.109137,
+			"upOffset": 0.238889,
+			"downOffset": 0.238889,
 			"leftKey": "Key_A",
 			"rightKey": "Key_D",
 			"upKey": "Key_W",
@@ -40,8 +40,8 @@
 			"type": "KMT_CLICK_TWICE",
 			"key": "Key_Q",
 			"pos": {
-				"x": 0.884,
-				"y": 0.474
+				"x": 0.189932,
+				"y": 0.308796
 			}
 		},
 		{
@@ -49,17 +49,27 @@
 			"type": "KMT_CLICK_TWICE",
 			"key": "Key_E",
 			"pos": {
-				"x": 0.934,
-				"y": 0.474
+				"x": 0.245135,
+				"y": 0.308796
 			}
 		},
 		{
-			"comment": "自动跑",
+			"comment": "一键持续冲刺",
 			"type": "KMT_CLICK",
 			"key": "Key_Equal",
 			"pos": {
-				"x": 0.842,
-				"y": 0.265
+				"x": 0.831218,
+				"y": 0.265741
+			},
+			"switchMap": false
+		},
+		{
+			"comment": "按键发言",
+			"type": "KMT_CLICK",
+			"key": "Key_Minus",
+			"pos": {
+				"x": 0.831218,
+				"y": 0.186111
 			},
 			"switchMap": false
 		},
@@ -134,24 +144,38 @@
 			"switchMap": false
 		},
 		{
-			"comment": "捡东西1",
-			"type": "KMT_CLICK",
+			"comment": "驾驶/开门/救援",
+			"type": "KMT_CLICK_MULTI",
 			"key": "Key_F",
-			"pos": {
-				"x": 0.699,
-				"y": 0.335
-			},
-			"switchMap": false
+			"clickNodes": [
+				{
+					"delay": 0,
+					"pos": { "x": 0.700085, "y": 0.423148 }
+				},
+				{
+					"delay": 30,
+					"pos": { "x": 0.701142, "y": 0.686111 }
+				},
+				{
+					"delay": 30,
+					"pos": { "x": 0.500635, "y": 0.611574 }
+				}
+			]
 		},
 		{
-			"comment": "捡东西2",
-			"type": "KMT_CLICK",
+			"comment": "背负/乘坐",
+			"type": "KMT_CLICK_MULTI",
 			"key": "Key_G",
-			"pos": {
-				"x": 0.699,
-				"y": 0.448
-			},
-			"switchMap": false
+			"clickNodes": [
+				{
+					"delay": 0,
+					"pos": { "x": 0.500635, "y": 0.734722 }
+				},
+				{
+					"delay": 30,
+					"pos": { "x": 0.700296, "y": 0.538889 }
+				}
+			]
 		},
 		{
 			"comment": "捡东西3",
@@ -184,12 +208,27 @@
 			"switchMap": false
 		},
 		{
-			"comment": "手雷",
+			"comment": "调整自动/单发",
+			"type": "KMT_CLICK_MULTI",
+			"key": "Key_B",
+			"clickNodes": [
+				{
+					"delay": 0,
+					"pos": { "x": 0.445220, "y": 0.820370 }
+				},
+				{
+					"delay": 30,
+					"pos": { "x": 0.554780, "y": 0.820370 }
+				}
+			]
+		},
+		{
+			"comment": "手枪",
 			"type": "KMT_CLICK",
 			"key": "Key_3",
 			"pos": {
-				"x": 0.652,
-				"y": 0.925
+				"x": 0.596,
+				"y": 0.82
 			},
 			"switchMap": false
 		},
@@ -204,42 +243,32 @@
 			"switchMap": false
 		},
 		{
-			"comment": "下车",
+			"comment": "手榴弹",
 			"type": "KMT_CLICK",
 			"key": "Key_5",
 			"pos": {
-				"x": 0.888,
-				"y": 0.407
+				"x": 0.652,
+				"y": 0.925
 			},
 			"switchMap": false
 		},
 		{
-			"comment": "救人",
+			"comment": "侧边镜",
 			"type": "KMT_CLICK",
 			"key": "Key_6",
 			"pos": {
-				"x": 0.5,
-				"y": 0.63
+				"x": 0.881768,
+				"y": 0.467130
 			},
 			"switchMap": false
 		},
 		{
-			"comment": "手枪",
+			"comment": "下车",
 			"type": "KMT_CLICK",
 			"key": "Key_7",
 			"pos": {
-				"x": 0.596,
-				"y": 0.82
-			},
-			"switchMap": false
-		},
-		{
-			"comment": "车加速",
-			"type": "KMT_CLICK",
-			"key": "Key_Shift",
-			"pos": {
-				"x": 0.8,
-				"y": 0.8
+				"x": 0.913071,
+				"y": 0.398611
 			},
 			"switchMap": false
 		},
@@ -284,12 +313,22 @@
 			"switchMap": true
 		},
 		{
-			"comment": "开关门",
+			"comment": "物资箱",
 			"type": "KMT_CLICK",
 			"key": "Key_X",
 			"pos": {
-				"x": 0.696,
-				"y": 0.69
+				"x": 0.696489,
+				"y": 0.245833
+			},
+			"switchMap": false
+		},
+		{
+			"comment": "发定位",
+			"type": "KMT_CLICK",
+			"key": "MiddleButton",
+			"pos": {
+				"x": 0.886421,
+				"y": 0.334722
 			},
 			"switchMap": false
 		},

@@ -698,7 +698,7 @@ void Dialog::on_refreshGameScriptBtn_clicked()
         ui->gameBox->addItem(fileInfo.fileName());
     }
 
-    int hydIndex = ui->gameBox->findText("gp-hyd.json");
+    int hydIndex = ui->gameBox->findText(QString::fromUtf8("和平精英-v1.0.1.json"));
     if (hydIndex >= 0) {
         ui->gameBox->setCurrentIndex(hydIndex);
     }
